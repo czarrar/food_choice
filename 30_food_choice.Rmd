@@ -1,0 +1,183 @@
+---
+title: "Food Choice"
+output: html_document
+---
+
+This page will examine the link between food ratings and food choice.
+
+# Load and Format
+
+```{r}
+library(plyr)
+library(ggthemr)
+library(RColorBrewer)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+```
+
+```{r}
+dat <- read.csv("z_trial_data.csv", stringsAsFactors = T)[,-1]
+```
+
+Merge the 3 factor scores on the food ratings.
+
+```{r}
+rate.facs <- read.csv("z_foodrating_factors.csv")[,-1]
+dat <- merge(dat, rate.facs)
+```
+
+Select only the needed columns
+
+```{r}
+sdat <- dat %>%
+  select(subjectId, stimulus, dieting, age, gender, bmi, hunger.time1.rating, hunger.time2.rating, choice.rating, choice.rt,  starts_with("rating"), Total_kcal, CHO_g, PRO_g, Fat_g, starts_with("Qs"), starts_with("Food")) %>%
+  select(-food.allergies) %>%
+  rename(hunger.time1 = hunger.time1.rating, hunger.time2 = hunger.time2.rating) %>%
+  mutate(hunger.change = hunger.time2 - hunger.time1) %>%
+  mutate(age2 = as.numeric(age)) %>%
+  mutate(Food.Health = Food.UnHealth*-1) %>%
+  select(-hunger.time2)
+sdat$Qs.Restraint <- dat$tfeq.cognitive.restraint
+head(sdat)
+```
+
+# 1. Do food attributes influence food choice?
+
+## Model Fit
+
+Health2 is the flip of Health, which is actually about how unhealthy the food is.
+
+```{r, cache=TRUE}
+fit1 <- lmer(choice.rating ~ Food.Taste + Food.Health + Food.SweetProtein + stimulus + (Food.Taste + Food.Health + Food.SweetProtein|subjectId), data=sdat)
+sfit1 <- summary(fit1)
+round(sfit1$coefficients[-grep("stimulus", rownames(sfit1$coefficients)),], 4)
+```
+
+## Viz
+
+Again not plotting averages, just the main scores
+
+```{r}
+ave.adat <- sdat %>% 
+  group_by(stimulus) %>% 
+  summarise(choice=mean(choice.rating)/10, 
+            tasty=mean(Food.Taste),
+            healthy=mean(Food.Health), 
+            protein=mean(Food.SweetProtein))
+
+head(ave.adat)
+```
+
+```{r, fig.width=4, fig.height=3}
+ggthemr("pale", text_size=24)
+
+# Taste
+ggplot(ave.adat, aes(tasty, choice)) + 
+  geom_point(alpha=0.5, size=2.5, shape=16, color="#A8AB65", fill="#A8AB65") +
+  geom_smooth(method = "lm", color="#6C6E41", fill="#6C6E41", alpha=0.25) +
+  scale_y_continuous(limits=c(0,1), expand=c(0,0)) + 
+  theme(text = element_text(family="Roboto")) +
+  xlab("Taste Rating") + ylab("Choice")
+
+# Health
+ggplot(ave.adat, aes(healthy, choice)) + 
+  geom_point(alpha=0.5, size=2.5, shape=16, color="#CBAC69", fill="#CBAC69") +
+  geom_smooth(method = "lm", color="#8C7044", fill="#8C7044", alpha=0.25) +
+  scale_y_continuous(limits=c(0,1), expand=c(0,0)) +
+  theme(text = element_text(family="Roboto"), axis.ticks.y = element_blank(), axis.line.y = element_blank()) +
+  xlab("Health Rating") + ylab("Choice")
+
+# Protein
+ggplot(ave.adat, aes(protein, choice)) + 
+  geom_point(alpha=0.5, size=2.5, shape=16, color="#CF7330", fill="#CF7330") +
+  geom_smooth(method = "lm", color="#804E28", fill="#804E28", alpha=0.25) +
+  scale_y_continuous(limits=c(0,1), expand=c(0,0)) + #scale_x_continuous(expand=c(0,0,0,0.5)) +
+  theme(text = element_text(family="Roboto"), axis.ticks.y = element_blank(), axis.line.y = element_blank()) +
+  xlab("Protein Rating") + ylab("Choice")
+```
+
+# 2. What factors modulate food choice?
+
+Looking at BMI, Gender, and Age.
+
+## Model Fit
+
+```{r, cache=TRUE}
+fit2 <- lmer(choice.rating ~ Food.Taste + Food.Health + Food.SweetProtein + bmi + bmi*Food.Taste + bmi*Food.Health + bmi*Food.SweetProtein + gender + gender*Food.Taste + gender*Food.Health + gender*Food.SweetProtein + age2 + age2*Food.Taste + age2*Food.Health + age2*Food.SweetProtein + stimulus + (Food.Taste + Food.Health + Food.SweetProtein|subjectId), data=sdat)
+sfit2 <- summary(fit2)
+round(sfit2$coefficients[-grep("stimulus", rownames(sfit2$coefficients)),], 4)
+```
+
+This gathers together each participants beta-coefficent 
+
+```{r, fig.height=2, fig.width=1.5, cache=TRUE}
+random.effects <- ranef(fit1)$subjectId
+random.effects$subjectId <- rownames(random.effects)
+df <- inner_join(sdat %>% select(subjectId, bmi, gender, age, age2), random.effects)
+```
+
+## Plot
+   
+```{r, fig.height=5, fig.width=5}
+ggthemr("pale", text_size=24)
+
+# BMI and Health
+ggplot(df, aes(x=bmi, y=Food.Health)) +
+  geom_hline(yintercept=0, color="grey50") +
+  geom_blank() +
+  #geom_point(alpha=0.25, size=1.5, shape=16, color="#CBAC69", fill="#CBAC69") +
+  geom_smooth(method = "lm", color="#CBAC69", fill="#CBAC69", alpha=0.25) +
+  coord_cartesian(ylim = c(0.1,-0.5)) +
+  theme(text = element_text(family="Roboto")) +
+  xlab("BMI") + ylab("Health Choice Beta")
+```
+
+```{r, fig.height=5, fig.width=5}
+# Gender and Health
+gdf <- df %>% group_by(gender) %>% summarise(health=mean(Food.Health))
+ggplot(gdf, aes(x=gender, y=health)) +
+  geom_hline(yintercept=0, color="grey50") +
+  geom_segment(aes(x=gender, xend=gender, y=0, yend=health), color="#CBAC69", size=2) + ##8C7044
+  geom_point(size=6, color="#8C7044") +
+  scale_y_continuous(limits = c(-0.11,0.11)) +
+  theme(axis.line = element_blank(), axis.title.x = element_blank(), axis.ticks.x = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(size=16)) +
+  ylab("Health Choice Beta")
+```
+
+```{r, fig.height=4.5, fig.width=5}
+# Age and Health
+ggplot(df, aes(x=age, y=Food.Health)) +
+  geom_hline(yintercept=0, color="grey50") +
+  geom_blank() +
+  geom_smooth(aes(x=age2), method = "lm", color="#CBAC69", fill="#CBAC69", alpha=0.25) +
+  coord_cartesian(ylim=c(-0.2,0.4)) +
+  theme(text = element_text(family="Roboto"), axis.text.x = element_text(angle=90, vjust=0.5, size=16)) +
+  ylab("Health Choice Beta") + xlab("Age")
+```
+
+```{r, fig.height=4.5, fig.width=5}
+# Age and Taste
+ggplot(df, aes(x=age, y=Food.Taste)) +
+  geom_hline(yintercept=0, color="grey50") +
+  geom_blank() +
+  #geom_point(alpha=0.2, size=1, shape=16, color="#CBAC69", fill="#CBAC69") +
+  geom_smooth(aes(x=age2), method = "lm", color="#CBAC69", fill="#CBAC69", alpha=0.25) +
+  coord_cartesian(ylim=c(-0.2,0.4)) +
+  theme(text = element_text(family="Roboto"), axis.text.x = element_text(angle=90, vjust=0.5, size=16)) +
+  xlab("Age") + ylab("Taste Choice Beta")
+```
+
+```{r, fig.height=4.5, fig.width=5}
+# Gender and Health
+gdf <- df %>% group_by(gender) %>% summarise(protein=mean(Food.SweetProtein))
+ggplot(gdf, aes(x=gender, y=protein)) +
+  geom_hline(yintercept=0, color="grey50") +
+  geom_segment(aes(x=gender, xend=gender, y=0, yend=protein), color="#CBAC69", size=2) + ##8C7044
+  geom_point(size=6, color="#8C7044") +
+  scale_y_continuous(limits = c(-0.11,0.11)) +
+  theme(panel.grid.major.x = element_blank(), axis.title.x = element_blank(), axis.line = element_blank(), axis.ticks.x = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(size=16)) +
+  ylab("Protein Choice Beta")
+```
+

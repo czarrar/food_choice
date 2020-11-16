@@ -1,0 +1,167 @@
+---
+title: "Food Factors"
+output: html_document
+---
+
+# Load and Format the Data
+
+```{r}
+library(MASS)
+library(plyr)
+library(corrplot)
+library(RColorBrewer)
+suppressWarnings(library(ggplot2))
+library(tidyverse)
+```
+
+```{r}
+dat <- read.csv("z_trial_data.csv")[,-1]
+dat <- as_tibble(dat)
+```
+
+To make the visuals more interpretable, we will flip 4 of the measures. This is to make these four measures become positively related to the other measures.
+
+* Sugar => Low-Sugar
+* Disgusting => Not Disgusting
+* Healthy => Unhealthy
+* Vitamins => Low vitamins
+
+```{r}
+rdat <- dat %>% select(stimulus, choice.rating, starts_with("rating"))
+
+# Rename
+colnames(rdat) <- sub("rating[.]", "", colnames(rdat))
+colnames(rdat) <- sub("[.]rating", "", colnames(rdat))
+
+# Flip
+rdat$sugar <- 10 - rdat$sugar
+rdat$disgusting <- 10 - rdat$disgusting
+rdat$healthy <- 10 - rdat$healthy
+rdat$vitamins <- 10 - rdat$vitamins
+## rename
+cinds <- sapply(c("sugar", "disgusting", "healthy", "vitamins"), function(x) which(colnames(rdat) == x))
+colnames(rdat)[cinds] <- c("low-sugar", "not-disgusting", "unhealthy", "low-vitamins")
+
+# For use with analysis
+rmat <- as.matrix(rdat[,-1])
+rownames(rmat) <- rdat$stimulus
+rmat.nochoice <- rmat[,-1]
+
+# Shows the ratings/choice for each of the food items
+head(rmat)
+```
+
+
+# Correlation Matrix
+
+Get the average of each of the ratings/choice across participants. Then compute and visualize the correlations between each pair of ratings/choice.
+
+```{r}
+ave.mat <- rdat %>% 
+  group_by(stimulus) %>% 
+  summarise_all(mean) %>% 
+  select(-stimulus)
+
+M <- cor(ave.mat)
+diag(M) <- 0
+
+corrplot(M, method="circle", diag = F, order="hclust", 
+         #is.corr=F, cl.lim=c(-0.85,0.85), 
+         col=rev(colorRampPalette(brewer.pal(n=11, name="RdBu"))(256)))
+```
+
+Manually order based on what we might have expected to see
+
+```{r}
+new.ord <- c("familiar", "calories", "fat", "protein", "carbohydrates", "gluten", "low-vitamins", "sodium", "low-sugar", "sweetsaltysavory", "filling", "texture", "not-disgusting", "feel", "othertasty", "tasty", "unhealthy", "choice")
+
+ave.mat2 <- ave.mat[,new.ord]
+M <- cor(ave.mat2)
+diag(M) <- 0
+
+corrplot(M, method="circle", diag = F, #order="hclust", 
+         #is.corr=F, cl.lim=c(-0.85,0.85), 
+         col=rev(colorRampPalette(brewer.pal(n=11, name="RdBu"))(256)))
+```
+
+
+# Factor Analysis
+
+We can see that there is a clear structure in the data above. Here, we try to extract that structure by doing a factor analysis.
+
+For the factor analysis, I will remove the choice data to make it only about the ratings.
+
+Please note in the section below, I go through a few different possibilities for the number of factors. I select 3 since that is the best with the CNG method and also because that number best explains choice behavior.
+
+Determine the optimal number of factors (it's 3)
+
+```{r}
+nFactors::nCng(as.data.frame(rmat.nochoice), model="factors") 
+```
+
+```{r}
+cols2 <- colorRampPalette(c("#67001F", "#B2182B", "#D6604D", 
+                            "#F4A582", "#FDDBC7", "#FFFFFF", "#D1E5F0", "#92C5DE", 
+                            "#4393C3", "#2166AC", "#053061"))(200)
+```
+
+Plot 3 factors and there factor scores. I use hierarchical clustering to order the different ratings and make the plot more interpretable.
+
+```{r}
+fit <- factanal(rmat.nochoice, 3, scores="regression")
+
+d <- dist(fit$loadings)
+hc <- hclust(d, method="average")
+dend <- as.dendrogram(hc)
+loads <- fit$loadings[order.dendrogram(dend),]
+loads <- rbind(choice=loads[rownames(loads) == "choice",], loads[rownames(loads) != "choice",])
+
+# Make tasty first, then health, and finally sweet/savory
+loads2 <- loads[,c(2,1,3)]
+colnames(loads2) <- sprintf("Factor-%i", 1:3)
+
+# Put the sweet/savory to the end
+#loads2 <- rbind(loads2[-c(1:4),], loads2[4:1,])
+loads2 <- rbind(loads2[-c(1:4),], loads2[1:4,])
+
+# Just for reporting purposes
+sort(loads2[,1], decreasing = T)
+sort(loads2[,2], decreasing = T)
+sort(loads2[,3], decreasing = T)
+
+# Plot
+corrplot::corrplot(loads2, diag=T, col=rev(cols2), cl.pos="n")
+```
+
+Do a different arrangement for the audience.
+
+```{r}
+rlabs <- c("tasty", "othertasty", "feel", "texture", "not-disgusting", "familiar", 
+  "calories", "unhealthy", "fat", "carbohydrates", "low-vitamins", "gluten", "sodium", 
+  "protein", "sweetsaltysavory", "filling", "low-sugar")
+
+inds <- sapply(rlabs, function(x) which(rownames(loads2)==x))
+corrplot::corrplot(loads2[inds,], diag=T, col=rev(cols2), cl.pos="n")
+```
+Gather the scores and re-label the columns accordingly.
+
+```{r}
+# scores and re-label columns
+scores3 <- fit$scores
+ind1 <- which.max(fit$loadings[rownames(fit$loadings) == "unhealthy",])
+ind2 <- which.max(fit$loadings[rownames(fit$loadings) == "tasty",])
+ind3 <- which.max(fit$loadings[rownames(fit$loadings) == "sweetsaltysavory",])
+colnames(scores3) <- c("Food.UnHealth", "Food.Taste", "Food.SweetProtein")[c(ind1,ind2,ind3)]
+```
+
+Save the data out
+
+```{r}
+head(scores3)
+```
+
+```{r}
+outdf <- data.frame(subjectId=dat$subjectId, stimulus=dat$stimulus, scores3)
+write.csv(outdf, file="z_foodrating_factors.csv")
+```
+
