@@ -1,0 +1,119 @@
+---
+title: "Demographics"
+output: html_document
+---
+
+This script is solely for displaying the demographics of the data.
+
+We first declare ALL libraries up here. We make sure to have dplyr be the last one declared to prevent any errors.
+
+```{r}
+suppressWarnings(library(plyr))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(ggthemr))
+library(tidyverse)
+
+ggthemr('fresh', text_size = 20)
+```
+
+# Reading and Formatting the Data
+
+Let's load the data.
+
+```{r}
+demo.sdat <- read_csv("z_demographics_data.csv")[,-1]
+head(demo.sdat)
+```
+
+Group the participants based on their BMI according to known groupings.
+
+```{r}
+demo.sdat$bmi.group <- cut(demo.sdat$bmi, c(0,18.5,25,30,Inf))
+
+levels(demo.sdat$bmi.group)[levels(demo.sdat$bmi.group)=="(0,18.5]"] <- "Underweight"
+levels(demo.sdat$bmi.group)[levels(demo.sdat$bmi.group)=="(18.5,25]"] <- "Normal"
+levels(demo.sdat$bmi.group)[levels(demo.sdat$bmi.group)=="(25,30]"] <- "Overweight"
+levels(demo.sdat$bmi.group)[levels(demo.sdat$bmi.group)=="(30,Inf]"] <- "Obese"
+```
+
+
+# Demographics
+
+In each of the plots below, we first summarize the data. For instance, for gender, we get the total number of participants who identified as male and female.
+
+## Gender
+
+It's pretty even so easy.
+
+```{r, fig.width=4, fig.height=4}
+sdat2 <- demo.sdat %>%
+  group_by(gender) %>%
+  summarise(n = n())
+sdat2
+
+ggplot(sdat2, aes(x=gender, y=n)) + 
+  geom_bar(stat="Identity") + 
+  xlab("") + ylab("Number of Participants") +
+  scale_y_continuous(expand = c(0,0)) + 
+  theme(axis.line.x = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.grid.major.y = element_line(size=0.5, linetype='solid'), 
+        axis.line.y = element_blank(), 
+        panel.grid.major.x = element_blank())
+```
+
+## Age
+
+Participants gave their ages in age bins (e.g., 18-25). We get the number of participants in each age bin.
+
+```{r, fig.width=8, fig.height=4}
+sdat2 <- data.frame(demo.sdat) %>%
+  group_by(age) %>%
+  summarise(n = n())
+sdat2
+
+ggplot(sdat2, aes(x=age, y=n)) + 
+  geom_bar(stat="Identity") + 
+  xlab("Age") + ylab("Number of Participants") + #ggtitle("Number of Participants by Age") +
+  scale_y_continuous(expand = c(0,0)) + 
+  theme(axis.line.x = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.grid.major.y = element_line(size=0.5, linetype='solid'), 
+        axis.line.y = element_blank(), 
+        panel.grid.major.x = element_blank())
+```
+
+
+## BMI
+
+We first plot the raw BMI values and then group them by underweight, overweight, obese, etc. 
+
+```{r, fig.width=8, fig.height=4}
+ggplot(demo.sdat, aes(x=bmi)) + 
+  geom_histogram(bins=20) +
+  xlab("BMI") + ylab("Number of Participants") + #ggtitle("Number of Participants by Age") +
+  scale_y_continuous(expand = c(0,0)) + 
+  theme(axis.line.x = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.grid.major.y = element_line(size=0.5, linetype='solid'), 
+        axis.line.y = element_blank(), 
+        panel.grid.major.x = element_blank())
+```
+
+```{r, fig.width=8, fig.height=4}
+sdat2 <- data.frame(demo.sdat) %>%
+  group_by(bmi.group) %>%
+  summarise(n = n())
+sdat2
+
+ggplot(sdat2, aes(x=bmi.group, y=n)) + 
+  geom_histogram(stat ="Identity") +
+  xlab("BMI Group") + ylab("Number of Participants") + #ggtitle("Number of Participants by Age") +
+  scale_y_continuous(expand = c(0,0)) +
+  theme(axis.line.x = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.grid.major.y = element_line(size=0.5, linetype='solid'), 
+        axis.line.y = element_blank(), 
+        panel.grid.major.x = element_blank())
+```
+

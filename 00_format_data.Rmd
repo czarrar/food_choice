@@ -1,0 +1,110 @@
+---
+title: "Format Data"
+output: html_document
+---
+
+This script just formats the data for all the fun.
+
+```{r}
+dat0 <- read.csv("stimchar_final_touse.csv")
+
+head(dat0)
+```
+
+Format the ages to all be the same type.
+
+```{r}
+dat <-dat0
+
+dat$age<-combineLevels(dat$age, levs = c("19", "20", "21", "22","23","24","25","18-25"), newLabel = c("18-25"))
+dat$age<-combineLevels(dat$age, levs = c("26", "27", "28", "29","30","26-30"), newLabel = c("26-30"))
+dat$age<-combineLevels(dat$age, levs = c("31", "32", "33", "34","35","31-35"), newLabel = c("31-35"))
+dat$age<-combineLevels(dat$age, levs = c("36", "37", "38", "39","40","36-40"), newLabel = c("36-40"))
+dat$age<-combineLevels(dat$age, levs = c("42", "41", "43", "44","45","41-45"), newLabel = c("41-45"))
+dat$age<-combineLevels(dat$age, levs = c("46", "47", "48", "49","50","46-50", "Above 46"), newLabel = c("46-50"))
+dat$age<-combineLevels(dat$age, levs = c("52", "51", "53", "54","55","51-55"), newLabel = c("51-55"))
+dat$age<-combineLevels(dat$age, levs = c("56","57", "58","59","60","56-60"), newLabel= c("56-60"))
+dat$age<-combineLevels(dat$age, levs = c("61","62","64","61-65"), newLabel = c("61-65"))
+dat$age<-combineLevels(dat$age, levs = c("67","68","69", "70","66-70"), newLabel = c("66-70"))
+dat$age<-combineLevels(dat$age, levs = c("71","71-75"), newLabel = c("71-75"))
+
+dat$age <- factor(dat$age, levels=c("18-25", "26-30", "31-35", "36-40", "41-45", "46-50","51-55", "56-60", "61-65", "66-70", "71-75"))
+
+head(dat$age)
+```
+
+Remove the 2 ppl who preferred not to answer the gender question
+
+```{r}
+# Display the total number
+dat %>% group_by(subjectId) %>% slice(1) %>% ungroup() %>% group_by(gender) %>% summarise(n=n())
+
+dat <- dat %>% 
+  filter(gender != "Prefer not to answer")
+
+dat$gender <- factor(dat$gender)
+
+head(dat$gender)
+```
+
+Format the levels for some other columns
+
+```{r}
+dat$from.us <- factor(dat$from.us, levels=c("Born in the US", "Moved to the US before 1 years old", "Moved to the US before 5 years old", "Moved to the US before 13 years old", "Moved to the US before 21 years old", "Moved to the US before 30 years old", "Moved to the US before 40 years old", "Moved to the US after 41 years old"))
+
+dat$life.stressful <- factor(dat$life.stressful, levels=c("Not at all", "A little ", "Somewhat", "Very", "Extremely"))
+
+dat$food.allergies <- factor(dat$food.allergies, levels=c("Eggs", "Fish/Shellfish", "Gluten", "Milk", "Peanuts", "Soy", "Tree Nuts", "Other", "None"))
+
+dat$exercise <- factor(dat$exercise, levels=rev(c("Every day", "Several times per week", "Once per week", "Several times per month", "Rarely", "Never")))
+
+dat$social.class <- factor(dat$social.class, levels=c("Below the poverty level", "Lower middle class", "Middle class", "Upper middle class", "Upper class"))
+
+dat$degree <- factor(dat$degree, levels=c("High school degree or equivalent (e.g. GED)", "Some college, no degree", "Associate degree (e.g. AA, AS)", "Bachelor's degree (e.g. BA, BS)", "Master's degree (e.g. MA, MS, MEd)", "Professional degree (e.g. MD, DDS, DVM)", "Doctorate (e.g. PhD, EdD)"), labels=c("High School", "Some college", "Associates", "Bachelors", "Masters", "Professional", "Doctorate"))
+
+dat$work <- factor(dat$work, levels=c("Unemployed and not currently looking for work", "Unemployed and currently looking for work", "Retired", "Student", "Homemaker", "Self-employed", "Employed part time (up to 39 hours per week)", "Employed full time (40 or more hours per week)"))
+
+dat$income <- factor(dat$income, levels=c("Less than $20,000", "$20,000 to $34,999", "$35,000 to $49,999", "$50,000 to $74,999", "$75,000 to $99,999", "Over $100,000"))
+```
+
+Save the formatted data
+
+```{r}
+write.csv(dat, file="/data/kfoerde/StimChar/StimChar/EDRS_poster_2019/z_trial_data.csv")
+```
+
+
+# Demographics Data
+
+Get only one row per person. Remove the multiple trials per person related to choice and rating.
+
+```{r}
+sdat <- dat %>%
+  group_by(subjectId) %>%
+  slice(1) %>%
+  select(-height, -weight, -reference, -stimulus, -starts_with('choice'), -starts_with('rating'), -starts_with('rt'))
+head(sdat)
+```
+
+Now select the relevant columns for the demographics.
+
+```{r}
+scols <- colnames(sdat)[c(3,5:31)]
+scols <- scols[!(scols %in% c("height", "weight", "weight.kg", "height.m", "highest.weight", "lowest.weight"))]
+scols
+```
+
+Select those columns for later analyses
+
+```{r}
+demo.sdat <- sdat[,scols]
+
+head(demo.sdat)
+```
+
+Save
+
+```{r}
+write.csv(demo.sdat, file="z_demographics_data.csv")
+```
+
