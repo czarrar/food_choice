@@ -34,7 +34,7 @@ Positive values are shown in red and negative values are shown in blue. Higher v
 A factor analysis identified 3 components among the ratings: sensory experience (taste, texture, etc), nutritional content (health, vitamins, etc), and unami flavor (savoriness,  protein, etc). Number of factors were determined by the CNG index.
 
 <p align="center">
-  <img src="https://github.com/czarrar/food_choice/blob/master/images/food_rating_factors" width="600" >
+  <img src="https://github.com/czarrar/food_choice/blob/master/images/food_rating_factors" width="700" >
 </p>
 
 
