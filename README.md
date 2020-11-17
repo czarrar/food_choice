@@ -26,7 +26,7 @@ The plots from the demographic data can be found in `10_demographics.html`.
 Ratings for each individual food item were averaged across subjects. Pairs of group-average ratings were correlated.
 
 <p align="center">
-  <img src="https://github.com/czarrar/food_choice/blob/master/images/food_rating_correlations" width="700" >
+  <img src="https://github.com/czarrar/food_choice/blob/master/images/food_rating_correlations" width="750" >
 </p>
 
 Positive values are shown in red and negative values are shown in blue. Higher values are shown as larger and darker circles.
